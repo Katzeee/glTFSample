@@ -53,6 +53,11 @@ public:
 
     void OnRender(const UIState* pState, const Camera& Cam, SwapChain* pSwapChain);
 
+    // MC Begin
+    void SetShadowMode(ShadowMode shadowMode) { m_ShadowMode = shadowMode; }
+
+    // MC End
+
 private:
     Device *m_pDevice;
 
@@ -72,10 +77,14 @@ private:
     GPUTimestamps                   m_GPUTimer;
 
     //gltf passes
-    GltfPbrPass                    *m_GLTFPBR;
     GltfBBoxPass                   *m_GLTFBBox;
     GltfDepthPass                  *m_GLTFDepth;
     GLTFTexturesAndBuffers         *m_pGLTFTexturesAndBuffers;
+
+    // MC Begin
+    //GltfPbrPass                    *m_GLTFPBR;
+    AeryPbrPass* m_GLTFPBR;
+    // MC End
 
     // effects
     Bloom                           m_Bloom;
@@ -120,5 +129,9 @@ private:
     std::vector<TimeStamp>          m_TimeStamps;
 
     AsyncPool                       m_AsyncPool;
+
+    // MC Begin
+    ShadowMode                      m_ShadowMode;
+    // MC End
 };
 

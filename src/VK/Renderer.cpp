@@ -296,6 +296,24 @@ int Renderer::LoadScene(GLTFCommon *pGLTFCommon, int Stage)
     {
         Profile p("m_GLTFPBR->OnCreate");
 
+        // MC Begin
+        m_GLTFPBR = new AeryPbrPass();
+        m_GLTFPBR->OnCreate(
+            m_pDevice,
+            &m_UploadHeap,
+            &m_ResourceViewHeaps,
+            &m_ConstantBufferRing,
+            &m_VidMemBufferPool,
+            m_pGLTFTexturesAndBuffers,
+            &m_SkyDome,
+            false, // use SSAO mask
+            m_ShadowSRVPool,
+            &m_RenderPassFullGBufferWithClear,
+            m_ShadowMode,
+            pAsyncPool
+        );
+
+        /*        
         // same thing as above but for the PBR pass
         m_GLTFPBR = new GltfPbrPass();
         m_GLTFPBR->OnCreate(
@@ -311,6 +329,8 @@ int Renderer::LoadScene(GLTFCommon *pGLTFCommon, int Stage)
             &m_RenderPassFullGBufferWithClear,
             pAsyncPool
         );
+        */
+        // MC End
 
         m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
         m_UploadHeap.FlushAndFinish();
@@ -563,8 +583,10 @@ void Renderer::OnRender(const UIState* pState, const Camera& Cam, SwapChain* pSw
     if (pPerFrame != NULL && m_GLTFPBR)
     {
         const bool bWireframe = pState->WireframeMode != UIState::WireframeMode::WIREFRAME_MODE_OFF;
-
-        std::vector<GltfPbrPass::BatchList> opaque, transparent;
+        // MC Begin
+        std::vector<AeryPbrPass::BatchList> opaque, transparent;
+        //std::vector<GltfPbrPass::BatchList> opaque, transparent;
+        // MC End
         m_GLTFPBR->BuildBatchLists(&opaque, &transparent, bWireframe);
 
         // Render opaque 

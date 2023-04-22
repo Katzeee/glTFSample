@@ -72,6 +72,10 @@ struct UIState
     //
     bool  bShowMilliseconds;
 
+    // MC Begin
+    ShadowMode m_shadowMode;
+    // MC End
+
     // -----------------------------------------------
 
     void Initialize();
