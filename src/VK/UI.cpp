@@ -63,8 +63,12 @@ template<class T> static T clamped(const T& v, const T& min, const T& max)
 void GLTFSample::BuildUI()
 {
     // if we haven't initialized GLTFLoader yet, don't draw UI.
-    if (m_pGltfLoader == nullptr)
+    if (m_pGltfLoader == nullptr || shouldReloadScene)
     {
+        // MC Begin
+        shouldReloadScene = false;
+        m_pRenderer->SetShadowMode(m_UIState.m_shadowMode);
+        // MC End
         LoadScene(m_activeScene);
         return;
     }
@@ -232,6 +236,21 @@ void GLTFSample::BuildUI()
         ImGui::Spacing();
         ImGui::Spacing();
 
+        // MC Begin
+        if (ImGui::CollapsingHeader("Shadow", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            const char* shadowModes[] = { "None", "HardShadow", "PCF", "PCSS" , "VSM" };
+            if (ImGui::Combo("Shadow Mode", (int*)&m_UIState.m_shadowMode, shadowModes, _countof(shadowModes)))
+            {
+                m_pRenderer->SetShadowMode(m_UIState.m_shadowMode);
+                shouldReloadScene = true;
+            }
+        }        
+        
+        ImGui::Spacing();
+        ImGui::Spacing();
+        // MC End
+
         if (m_FreesyncHDROptionEnabled && ImGui::CollapsingHeader("FreeSync HDR", ImGuiTreeNodeFlags_DefaultOpen))
         {
             static bool openWarning = false;
@@ -381,6 +400,9 @@ void UIState::Initialize()
     this->WireframeColor[2] = 0.0f;
     this->bShowControlsWindow = true;
     this->bShowProfilerWindow = true;
+    // MC Begin
+    this->m_shadowMode = ShadowMode::PCF;
+    // MC End
 }
 
 

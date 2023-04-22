@@ -66,4 +66,8 @@ private:
     int                         m_activeCamera;
 
     bool                        m_bPlay;
+
+    // MC Begin
+    bool shouldReloadScene = false;
+    // MC End
 };

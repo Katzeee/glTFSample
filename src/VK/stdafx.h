@@ -44,6 +44,10 @@
 #include "GLTF/GltfBBoxPass.h"
 #include "GLTF/GltfDepthPass.h"
 
+// MC Begin
+#include "GLTF/AeryPbrPass.h"
+// MC End
+
 #include "Misc/Misc.h"
 #include "Misc/Camera.h"
 
