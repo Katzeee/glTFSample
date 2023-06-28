@@ -116,11 +116,18 @@ private:
         uint32_t        ShadowResolution;
         uint32_t        LightIndex;
         VkImageView     ShadowDSV;
+        // MC Begin
+        Texture         MomentMap;
+        VkImageView     MomentRTV;
+        // MC End
         VkFramebuffer   ShadowFrameBuffer;
     } SceneShadowInfo;
 
     std::vector<SceneShadowInfo>    m_shadowMapPool;
     std::vector< VkImageView>       m_ShadowSRVPool;
+    // MC Begin
+    std::vector< VkImageView>       m_MomentSRVPool;
+    // MC End
 
     // widgets
     Wireframe                       m_Wireframe;

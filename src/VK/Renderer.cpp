@@ -86,7 +86,18 @@ void Renderer::OnCreate(Device *pDevice, SwapChain *pSwapChain, float FontSize)
     {
         VkAttachmentDescription depthAttachments;
         AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
-        m_Render_pass_shadow = CreateRenderPassOptimal(m_pDevice->GetDevice(), 0, NULL, &depthAttachments);
+        // MC Begin
+        if (m_ShadowMode == ShadowMode::VSM)
+        {
+            VkAttachmentDescription momentAttachments[1];
+            AttachClearBeforeUse(VK_FORMAT_R32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, momentAttachments);
+            m_Render_pass_shadow = CreateRenderPassOptimal(m_pDevice->GetDevice(), 1, momentAttachments, &depthAttachments);
+        }
+        else
+        // MC End
+        {
+            m_Render_pass_shadow = CreateRenderPassOptimal(m_pDevice->GetDevice(), 0, nullptr, &depthAttachments);
+        }
     }
 
     m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, "..\\media\\cauldron-media\\envmaps\\papermill\\diffuse.dds", "..\\media\\cauldron-media\\envmaps\\papermill\\specular.dds", VK_SAMPLE_COUNT_1_BIT);
@@ -286,6 +297,7 @@ int Renderer::LoadScene(GLTFCommon *pGLTFCommon, int Stage)
             &m_ConstantBufferRing,
             &m_VidMemBufferPool,
             m_pGLTFTexturesAndBuffers,
+            m_ShadowMode,
             pAsyncPool
         );
 
@@ -308,6 +320,7 @@ int Renderer::LoadScene(GLTFCommon *pGLTFCommon, int Stage)
             &m_SkyDome,
             false, // use SSAO mask
             m_ShadowSRVPool,
+            m_MomentSRVPool,
             &m_RenderPassFullGBufferWithClear,
             m_ShadowMode,
             pAsyncPool
@@ -412,16 +425,39 @@ void Renderer::UnloadScene()
         m_pGLTFTexturesAndBuffers = NULL;
     }
 
-    assert(m_shadowMapPool.size() == m_ShadowSRVPool.size());
-    while (!m_shadowMapPool.empty())
+    // MC Begin
+    if (!m_MomentSRVPool.empty())
     {
-        m_shadowMapPool.back().ShadowMap.OnDestroy();
-        vkDestroyFramebuffer(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowFrameBuffer, nullptr);
-        vkDestroyImageView(m_pDevice->GetDevice(), m_ShadowSRVPool.back(), nullptr);
-        vkDestroyImageView(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowDSV, nullptr);
-        m_ShadowSRVPool.pop_back();
-        m_shadowMapPool.pop_back();
+        assert(m_shadowMapPool.size() == m_ShadowSRVPool.size() && m_shadowMapPool.size() == m_MomentSRVPool.size());
+        while (!m_shadowMapPool.empty())
+        {
+            m_shadowMapPool.back().ShadowMap.OnDestroy();
+            m_shadowMapPool.back().MomentMap.OnDestroy();
+            vkDestroyFramebuffer(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowFrameBuffer, nullptr);
+            vkDestroyImageView(m_pDevice->GetDevice(), m_ShadowSRVPool.back(), nullptr);
+            vkDestroyImageView(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowDSV, nullptr);
+            vkDestroyImageView(m_pDevice->GetDevice(), m_MomentSRVPool.back(), nullptr);
+            vkDestroyImageView(m_pDevice->GetDevice(), m_shadowMapPool.back().MomentRTV, nullptr);
+            m_ShadowSRVPool.pop_back();
+            m_MomentSRVPool.pop_back();
+            m_shadowMapPool.pop_back();
+        }
     }
+    else
+    // MC End
+    {
+        assert(m_shadowMapPool.size() == m_ShadowSRVPool.size());
+        while (!m_shadowMapPool.empty())
+        {
+            m_shadowMapPool.back().ShadowMap.OnDestroy();
+            vkDestroyFramebuffer(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowFrameBuffer, nullptr);
+            vkDestroyImageView(m_pDevice->GetDevice(), m_ShadowSRVPool.back(), nullptr);
+            vkDestroyImageView(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowDSV, nullptr);
+            m_ShadowSRVPool.pop_back();
+            m_shadowMapPool.pop_back();
+        }
+    }
+
 }
 
 void Renderer::AllocateShadowMaps(GLTFCommon* pGLTFCommon)
@@ -456,18 +492,50 @@ void Renderer::AllocateShadowMaps(GLTFCommon* pGLTFCommon)
             CurrentShadow->ShadowMap.InitDepthStencil(m_pDevice, CurrentShadow->ShadowResolution, CurrentShadow->ShadowResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, "ShadowMap");
             CurrentShadow->ShadowMap.CreateDSV(&CurrentShadow->ShadowDSV);
 
+            // MC Begin
+            if (m_ShadowMode == ShadowMode::VSM)
+            {
+                CurrentShadow->MomentMap.InitRenderTarget(m_pDevice, CurrentShadow->ShadowResolution, CurrentShadow->ShadowResolution, VK_FORMAT_R32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, 
+                    (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "MomentTexture");
+                CurrentShadow->MomentMap.CreateRTV(&CurrentShadow->MomentRTV);
+            }
+            // MC End
+
             // Create render pass shadow, will clear contents
             {
+
                 VkAttachmentDescription depthAttachments;
                 AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
 
                 // Create frame buffer
-                VkImageView attachmentViews[1] = { CurrentShadow->ShadowDSV };
+                //VkImageView attachmentViews[1] = { CurrentShadow->ShadowDSV };
+                VkImageView attachmentViews[2];
+                if (m_ShadowMode == ShadowMode::VSM)
+                {
+                    attachmentViews[1] = CurrentShadow->ShadowDSV;
+                    attachmentViews[0] = CurrentShadow->MomentRTV;
+                }
+                else
+                {
+                    attachmentViews[0] = CurrentShadow->ShadowDSV;
+                }
+                // MC End
+
                 VkFramebufferCreateInfo fb_info = {};
                 fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
                 fb_info.pNext = NULL;
                 fb_info.renderPass = m_Render_pass_shadow;
-                fb_info.attachmentCount = 1;
+                // MC Begin
+                if (m_ShadowMode == ShadowMode::VSM)
+                {
+                    fb_info.attachmentCount = 2;
+                }
+                else
+                {
+                    fb_info.attachmentCount = 1; 
+                }
+                //fb_info.attachmentCount = 1; 
+                // MC End
                 fb_info.pAttachments = attachmentViews;
                 fb_info.width = CurrentShadow->ShadowResolution;
                 fb_info.height = CurrentShadow->ShadowResolution;
@@ -479,6 +547,14 @@ void Renderer::AllocateShadowMaps(GLTFCommon* pGLTFCommon)
             VkImageView ShadowSRV;
             CurrentShadow->ShadowMap.CreateSRV(&ShadowSRV);
             m_ShadowSRVPool.push_back(ShadowSRV);
+            // MC Begin
+            if (m_ShadowMode == ShadowMode::VSM)
+            {
+                VkImageView MomentSRV;
+                CurrentShadow->MomentMap.CreateSRV(&MomentSRV);
+                m_MomentSRVPool.push_back(MomentSRV);
+            }
+            // MC End
         }
     }
 }
